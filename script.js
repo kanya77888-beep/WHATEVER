@@ -178,51 +178,68 @@ async function extractTextFromFile(file) {
     throw new Error("Unsupported file format");
 }
 
-// ===== AI Integration =====
 async function callGeminiAI(text, scope) {
-    const prompt = `
-        Analyze the following data within the scope of "${scope}".
-        Provide a structured JSON response with the following fields:
-        {
-          "summary": "Short professional executive summary",
-          "extractConfidence": 0.95,
-          "costConfidence": 0.88,
-          "riskConfidence": 0.76,
-          "entities": [
-            {"entity": "Entity Name", "category": "Category", "value": "Value", "confidence": 0.9}
-          ],
-          "riskData": [10, 20, 30, 40] 
+    const modelsToTry = [
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-latest',
+        'gemini-1.5-pro-latest',
+        'gemini-pro'
+    ];
+
+    let lastError = null;
+
+    for (const model of modelsToTry) {
+        try {
+            console.log(`Trying model: ${model}...`);
+            const prompt = `
+                Analyze the following data within the scope of "${scope}".
+                Provide a structured JSON response with the following fields:
+                {
+                  "summary": "Short professional executive summary",
+                  "extractConfidence": 0.95,
+                  "costConfidence": 0.88,
+                  "riskConfidence": 0.76,
+                  "entities": [
+                    {"entity": "Entity Name", "category": "Category", "value": "Value", "confidence": 0.9}
+                  ],
+                  "riskData": [10, 20, 30, 40] 
+                }
+                IMPORTANT: Return ONLY the JSON object. No preamble, no postamble, no markdown markers.
+                Data: ${text.substring(0, 10000)}
+            `;
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                lastError = errorBody?.error?.message || `API Error: ${response.status}`;
+                console.warn(`Model ${model} failed: ${lastError}`);
+                continue; 
+            }
+
+            const resData = await response.json();
+            if (!resData.candidates || !resData.candidates[0]) {
+                lastError = "Empty response from AI";
+                continue;
+            }
+
+            const resultText = resData.candidates[0].content.parts[0].text;
+            const cleanJson = resultText.replace(/```json/gi, '').replace(/```/g, '').trim();
+            return JSON.parse(cleanJson);
+
+        } catch (e) {
+            lastError = e.message;
+            console.error(`Error with ${model}:`, e);
         }
-        IMPORTANT: Return ONLY the JSON object. No preamble, no postamble, no markdown markers.
-        Data: ${text.substring(0, 10000)}
-    `;
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
-        })
-    });
-
-    if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
-        throw new Error(errorBody?.error?.message || `API Error: ${response.status} ${response.statusText}`);
     }
-    
-    const resData = await response.json();
-    if (!resData.candidates || !resData.candidates[0]) throw new Error("AI returned an empty response.");
-    
-    const resultText = resData.candidates[0].content.parts[0].text;
-    
-    // Clean JSON from markdown if exists
-    const cleanJson = resultText.replace(/```json/gi, '').replace(/```/g, '').trim();
-    try {
-        return JSON.parse(cleanJson);
-    } catch (e) {
-        console.log("Raw AI Response:", resultText);
-        throw new Error("Failed to parse AI response. The data may be too complex or the AI reached a safety limit.");
-    }
+
+    throw new Error(lastError || "Could not find a supported Gemini model for your API key. Please check your region's availability.");
 }
 
 // ===== Dashboard Rendering =====
