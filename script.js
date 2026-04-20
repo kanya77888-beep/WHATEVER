@@ -1,495 +1,298 @@
 /* ========================================
-   PaperLens — Script
+   DecisionFlow — Core Application Logic
    ======================================== */
 
-// --- Sample paper text ---
-const SAMPLE_PAPER = `This paper introduces a novel method for AI paper evaluation using large language models. The structure of our framework leverages a zero-shot learning approach. While previous methodologies relied heavily on human annotations, our system automates the processing phase. The dataset utilized for this study contains 50 samples of abstract texts. Results indicate a 10% improvement in task completion speed, though accuracy varies by domain. Future work will aim to expand the dataset and fine-tune the model parameters.`;
+// --- Configuration ---
+let GEMINI_API_KEY = localStorage.getItem('gemini_api_key') || "";
+const SUPABASE_URL = ""; // To be filled by user
+const SUPABASE_KEY = ""; // To be filled by user
 
-// --- Review criteria config ---
-const CRITERIA = [
-    { name: 'Clarity & Writing Quality', emoji: '📝', key: 'clarity', max: 5 },
-    { name: 'Novelty / Originality', emoji: '💡', key: 'novelty', max: 5 },
-    { name: 'Technical Soundness', emoji: '⚙️', key: 'technical', max: 5 },
-    { name: 'Methodology & Rigor', emoji: '🔬', key: 'methodology', max: 5 },
-    { name: 'Significance / Impact', emoji: '⚡', key: 'significance', max: 5 },
-    { name: 'Structure & Organization', emoji: '📋', key: 'structure', max: 5 },
-    { name: 'Literature & References', emoji: '📚', key: 'literature', max: 5 },
-    { name: 'Scope Fit (Confidence)', emoji: '🎯', key: 'scope', max: 100 },
-];
+// --- State ---
+let selectedFile = null;
+let extractedText = "";
+let chartInstance = null;
 
-// ===== DOM Elements =====
-const paperInput = document.getElementById('paperInput');
-const charCount = document.getElementById('charCount');
-const loadSampleBtn = document.getElementById('loadSampleBtn');
-const clearBtn = document.getElementById('clearBtn');
-const reviewBtn = document.getElementById('reviewBtn');
-const outputEmpty = document.getElementById('outputEmpty');
-const outputLoading = document.getElementById('outputLoading');
-const outputResults = document.getElementById('outputResults');
-const resultsSummary = document.getElementById('resultsSummary');
-const resultsCriteria = document.getElementById('resultsCriteria');
-const copyResultBtn = document.getElementById('copyResultBtn');
-const navbar = document.getElementById('navbar');
-
-// New App UI elements
-const fileUploadZone = document.getElementById('fileUploadZone');
-const pdfFileInput = document.getElementById('pdfFileInput');
-const triggerUploadBtn = document.getElementById('triggerUploadBtn');
-const relatedPapersContainer = document.getElementById('relatedPapersContainer');
-const relatedPapersList = document.getElementById('relatedPapersList');
-const viewReportBtn = document.getElementById('viewReportBtn');
+// --- DOM Elements ---
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
 const scopeInput = document.getElementById('scopeInput');
+const processBtn = document.getElementById('processBtn');
+const processingOverlay = document.getElementById('processingOverlay');
+const dashboard = document.getElementById('dashboard');
+const progressBar = document.getElementById('progressBar');
+const progressContainer = document.getElementById('uploadProgress');
+const progressText = document.getElementById('progressText');
 
-// ===== Background Particles =====
-function createParticles() {
-    const container = document.getElementById('bgParticles');
-    const colors = ['#818cf8', '#c084fc', '#f472b6', '#34d399', '#38bdf8'];
-    
-    for (let i = 0; i < 30; i++) {
-        const particle = document.createElement('div');
-        particle.classList.add('particle');
-        const size = Math.random() * 4 + 1;
-        const color = colors[Math.floor(Math.random() * colors.length)];
-        
-        particle.style.cssText = `
-            width: ${size}px;
-            height: ${size}px;
-            background: ${color};
-            left: ${Math.random() * 100}%;
-            animation-duration: ${Math.random() * 15 + 10}s;
-            animation-delay: ${Math.random() * 10}s;
-        `;
-        container.appendChild(particle);
+const configOverlay = document.getElementById('configOverlay');
+const geminiKeyInput = document.getElementById('geminiApiKey');
+const saveConfigBtn = document.getElementById('saveConfigBtn');
+
+// ===== Initialization =====
+document.addEventListener('DOMContentLoaded', () => {
+    checkConfig();
+    setupEventListeners();
+});
+
+function checkConfig() {
+    if (!GEMINI_API_KEY) {
+        configOverlay.style.display = 'flex';
     }
 }
 
-// ===== Navbar Scroll Effect =====
-window.addEventListener('scroll', () => {
-    navbar.classList.toggle('scrolled', window.scrollY > 50);
-});
-
-// ===== Stat Counter Animation =====
-function animateCounters() {
-    const statValues = document.querySelectorAll('.stat-value[data-count]');
-    statValues.forEach(el => {
-        const target = parseInt(el.getAttribute('data-count'));
-        let current = 0;
-        const increment = target / 30;
-        const timer = setInterval(() => {
-            current += increment;
-            if (current >= target) {
-                el.textContent = target;
-                clearInterval(timer);
-            } else {
-                el.textContent = Math.floor(current);
-            }
-        }, 50);
-    });
-}
-
-// ===== Intersection Observer for Animations =====
-function setupScrollAnimations() {
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.style.opacity = '1';
-                entry.target.style.transform = 'translateY(0)';
-            }
-        });
-    }, { threshold: 0.1 });
-
-    document.querySelectorAll('.feature-card, .step-card').forEach(el => {
-        el.style.opacity = '0';
-        el.style.transform = 'translateY(30px)';
-        el.style.transition = `opacity 0.6s ease ${el.dataset.delay || 0}ms, transform 0.6s ease ${el.dataset.delay || 0}ms`;
-        observer.observe(el);
-    });
-}
-
-// ===== Character Counter =====
-paperInput.addEventListener('input', () => {
-    const len = paperInput.value.length;
-    charCount.textContent = `${len.toLocaleString()} character${len !== 1 ? 's' : ''}`;
-});
-
-// ===== PDF Upload Logic =====
-if (triggerUploadBtn) {
-    triggerUploadBtn.addEventListener('click', (e) => { e.stopPropagation(); pdfFileInput.click(); });
-    fileUploadZone.addEventListener('click', () => pdfFileInput.click());
-    pdfFileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            const file = e.target.files[0];
-            // Mock PDF extraction by inserting sample text
-            paperInput.value = `[Extracted from PDF: ${file.name}]\n\n${SAMPLE_PAPER}\n\n(Review simulation text automatically inserted for preview.)`;
-            paperInput.dispatchEvent(new Event('input'));
-            showToast('📄 PDF processed successfully!');
+function setupEventListeners() {
+    // Config
+    saveConfigBtn.addEventListener('click', () => {
+        const key = geminiKeyInput.value.trim();
+        if (key) {
+            GEMINI_API_KEY = key;
+            localStorage.setItem('gemini_api_key', key);
+            configOverlay.style.display = 'none';
+            showToast("✅ API Key Saved");
         }
     });
 
-    fileUploadZone.addEventListener('dragover', (e) => {
+    // File Upload Drag & Drop
+    dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
-        fileUploadZone.style.background = 'rgba(15, 76, 129, 0.05)';
-        fileUploadZone.style.borderColor = 'var(--accent-indigo)';
+        dropZone.style.borderColor = 'var(--accent-indigo)';
+        dropZone.style.background = 'rgba(15, 76, 129, 0.05)';
     });
 
-    fileUploadZone.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        fileUploadZone.style.background = 'rgba(0,0,0,0.01)';
-        fileUploadZone.style.borderColor = 'var(--border-subtle)';
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.style.borderColor = 'var(--border-subtle)';
+        dropZone.style.background = 'transparent';
     });
 
-    fileUploadZone.addEventListener('drop', (e) => {
+    dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
-        fileUploadZone.style.background = 'rgba(0,0,0,0.01)';
-        fileUploadZone.style.borderColor = 'var(--border-subtle)';
-        if (e.dataTransfer.files.length > 0) {
-            pdfFileInput.files = e.dataTransfer.files;
-            pdfFileInput.dispatchEvent(new Event('change'));
-        }
+        const files = e.dataTransfer.files;
+        if (files.length > 0) handleFile(files[0]);
     });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) handleFile(e.target.files[0]);
+    });
+
+    // Process Button
+    processBtn.addEventListener('click', startProcessing);
 }
 
-// ===== Load Sample =====
-loadSampleBtn.addEventListener('click', () => {
-    paperInput.value = SAMPLE_PAPER;
-    paperInput.dispatchEvent(new Event('input'));
-    showToast('✅ Sample paper loaded!');
-});
-
-// ===== Clear =====
-clearBtn.addEventListener('click', () => {
-    paperInput.value = '';
-    paperInput.dispatchEvent(new Event('input'));
-    outputEmpty.style.display = 'flex';
-    outputLoading.style.display = 'none';
-    outputResults.style.display = 'none';
-    copyResultBtn.style.display = 'none';
-    if(relatedPapersContainer) relatedPapersContainer.style.display = 'none';
-    if(pdfFileInput) pdfFileInput.value = ''; // clear file
-});
-
-// ===== Review Button =====
-reviewBtn.addEventListener('click', () => {
-    const text = paperInput.value.trim();
-    if (!text) {
-        showToast('⚠️ Please paste your paper first!', true);
-        paperInput.focus();
-        return;
-    }
-    if (text.length < 50) {
-        showToast('⚠️ Please provide at least 50 characters for a meaningful review.', true);
-        return;
-    }
-    runReview(text);
-});
-
-// ===== Simulated Review Engine =====
-// (In production, this would call the Gemini API via a backend)
-function runReview(text) {
-    // Show loading
-    outputEmpty.style.display = 'none';
-    outputLoading.style.display = 'flex';
-    outputResults.style.display = 'none';
-    copyResultBtn.style.display = 'none';
-
-    const steps = [
-        document.getElementById('step1'),
-        document.getElementById('step2'),
-        document.getElementById('step3'),
-    ];
-
-    // Reset steps
-    steps.forEach(s => { s.className = 'loading-step'; });
-    steps[0].classList.add('active');
-
-    // Animate steps
-    setTimeout(() => { steps[0].classList.replace('active', 'done'); steps[1].classList.add('active'); }, 800);
-    setTimeout(() => { steps[1].classList.replace('active', 'done'); steps[2].classList.add('active'); }, 1800);
-    setTimeout(() => { steps[2].classList.replace('active', 'done'); }, 2500);
-
-    // Generate results after "analysis"
-    setTimeout(() => {
-        const results = generateReview(text);
-        displayResults(results);
-    }, 3000);
-}
-
-function generateReview(text) {
-    // Smart heuristic-based review (simulating AI output)
-    const wordCount = text.split(/\s+/).length;
-    const sentenceCount = text.split(/[.!?]+/).filter(s => s.trim()).length;
-    const avgSentenceLen = wordCount / Math.max(sentenceCount, 1);
-    const hasAbstract = /abstract/i.test(text);
-    const hasConclusion = /conclusion|future work/i.test(text);
-    const hasMethodology = /method|approach|framework|algorithm/i.test(text);
-    const hasResults = /result|finding|performance|accuracy|improvement/i.test(text);
-    const hasReferences = /reference|\[\d+\]|et al\./i.test(text);
-    const hasNovelty = /novel|new|propose|introduce|first|innovative/i.test(text);
-    const hasData = /dataset|data|sample|experiment/i.test(text);
-    const uniqueWords = new Set(text.toLowerCase().match(/\b[a-z]+\b/g) || []).size;
-    const lexicalDiversity = uniqueWords / Math.max(wordCount, 1);
-
-    const scores = {};
-    const reasons = {};
-    const suggestions = {};
-
-    // Clarity
-    let clarity = 3;
-    if (avgSentenceLen < 20) clarity += 0.5;
-    if (avgSentenceLen > 30) clarity -= 0.5;
-    if (lexicalDiversity > 0.6) clarity += 0.5;
-    if (wordCount > 200) clarity += 0.3;
-    scores.clarity = Math.max(1, Math.min(5, Math.round(clarity * 10) / 10));
-    reasons.clarity = avgSentenceLen < 25
-        ? 'Writing is generally clear with manageable sentence lengths. The text flows reasonably well.'
-        : 'Some sentences are overly long and complex, which may reduce readability for a broad audience.';
-    suggestions.clarity = 'Consider varying sentence structure more and adding transition phrases between key ideas.';
-
-    // Novelty
-    let novelty = 2.5;
-    if (hasNovelty) novelty += 1;
-    if (hasMethodology) novelty += 0.5;
-    scores.novelty = Math.max(1, Math.min(5, Math.round(novelty * 10) / 10));
-    reasons.novelty = hasNovelty
-        ? 'The paper claims a novel contribution, though the degree of novelty could be better substantiated with comparisons.'
-        : 'The paper does not clearly articulate what is new or different about the proposed approach.';
-    suggestions.novelty = 'Explicitly state what distinguishes this work from prior art. A comparison table would strengthen claims of novelty.';
-
-    // Technical
-    let technical = 3;
-    if (hasResults) technical += 0.5;
-    if (hasData) technical += 0.5;
-    if (hasMethodology) technical += 0.3;
-    scores.technical = Math.max(1, Math.min(5, Math.round(technical * 10) / 10));
-    reasons.technical = hasResults
-        ? 'Results are mentioned but lack detailed statistical analysis. Claims could be more rigorously supported.'
-        : 'The paper lacks quantitative results to support its claims, weakening the technical foundation.';
-    suggestions.technical = 'Include confidence intervals, significance tests, or ablation studies to strengthen technical claims.';
-
-    // Methodology
-    let methodology = 2.5;
-    if (hasMethodology) methodology += 0.8;
-    if (hasData) methodology += 0.5;
-    if (wordCount > 300) methodology += 0.3;
-    scores.methodology = Math.max(1, Math.min(5, Math.round(methodology * 10) / 10));
-    reasons.methodology = hasMethodology
-        ? 'A methodology is described but lacks depth. Key details about experimental setup may be missing.'
-        : 'The methodology section is insufficient — no clear research design or experimental protocol is described.';
-    suggestions.methodology = 'Provide detailed steps of your methodology, including hyperparameters, evaluation metrics, and reproducibility details.';
-
-    // Significance
-    let significance = 2.5;
-    if (hasResults) significance += 0.5;
-    if (hasNovelty) significance += 0.5;
-    if (/impact|important|significant|advance/i.test(text)) significance += 0.5;
-    scores.significance = Math.max(1, Math.min(5, Math.round(significance * 10) / 10));
-    reasons.significance = 'The potential impact is moderate. The work addresses a relevant topic but broader implications are not clearly discussed.';
-    suggestions.significance = 'Discuss the broader implications of your findings and how they could influence future research or applications.';
-
-    // Structure
-    let structure = 3;
-    if (hasAbstract) structure += 0.5;
-    if (hasConclusion) structure += 0.5;
-    if (sentenceCount > 5) structure += 0.3;
-    scores.structure = Math.max(1, Math.min(5, Math.round(structure * 10) / 10));
-    reasons.structure = hasConclusion
-        ? 'The paper follows a reasonable structure with identifiable sections, though transitions could be smoother.'
-        : 'The paper structure is basic. Key sections like a detailed conclusion or discussion appear to be missing.';
-    suggestions.structure = 'Follow the standard IMRaD format (Introduction, Methods, Results, Discussion) for better organization.';
-
-    // Literature
-    let literature = 2;
-    if (hasReferences) literature += 1.5;
-    if (/previous|prior|existing|literature/i.test(text)) literature += 0.5;
-    scores.literature = Math.max(1, Math.min(5, Math.round(literature * 10) / 10));
-    reasons.literature = hasReferences
-        ? 'Some references are included but the literature review could be more comprehensive.'
-        : 'No formal references or citations are present. The work lacks grounding in existing literature.';
-    suggestions.literature = 'Add a thorough literature review section citing at least 15-20 relevant, recent papers in the field.';
-
-    // Scope
-    let scopeScore = 85; 
-    let scopeReason = "Paper naturally fits typical academic formatting and tone.";
-    let scopeSugg = "No specific scope was provided, so evaluating on general academic merit.";
-    
-    if (scopeInput && scopeInput.value.trim().length > 0) {
-        const keywords = scopeInput.value.toLowerCase().split(',').map(s => s.trim()).filter(s => s);
-        let matches = 0;
-        keywords.forEach(kw => {
-            if (text.toLowerCase().includes(kw)) matches++;
-        });
-        
-        if (matches === 0) scopeScore = 30;
-        else if (matches === keywords.length) scopeScore = 95;
-        else scopeScore = 60 + Math.floor((matches / keywords.length) * 35);
-        
-        scopeReason = matches > 0 
-            ? \`Found \${matches} out of \${keywords.length} target keywords. The paper aligns well with the provided scope.\`
-            : "The paper lacks the specific keywords defined in the target scope. Alignment is questionable.";
-            
-        scopeSugg = matches < keywords.length
-            ? "Consider explicitly incorporating the missing keywords into the abstract and introduction to strengthen scope alignment."
-            : "Strong alignment! Ensure the core thesis deeply explores these matched keywords.";
-    }
-    
-    scores.scope = scopeScore;
-    reasons.scope = scopeReason;
-    suggestions.scope = scopeSugg;
-
-    return { scores, reasons, suggestions };
-}
-
-function displayResults(results) {
-    const { scores, reasons, suggestions } = results;
-
-    // Calculate overall
-    const allScores = Object.values(scores);
-    const overall = (allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(1);
-
-    // Summary
-    let verdict = 'Needs Improvement';
-    let verdictDesc = 'The paper requires significant revisions across multiple criteria before it can be considered for publication.';
-    if (overall >= 4) {
-        verdict = 'Strong Paper';
-        verdictDesc = 'This paper demonstrates strong quality across most criteria. Minor revisions recommended.';
-    } else if (overall >= 3) {
-        verdict = 'Moderate Quality';
-        verdictDesc = 'The paper has a solid foundation but needs improvements in several areas. Consider a major revision.';
-    }
-
-    resultsSummary.innerHTML = `
-        <div class="overall-score">
-            <div class="score-circle">${overall}</div>
-            <span class="score-label">Overall</span>
-        </div>
-        <div class="summary-text">
-            <h3>${verdict}</h3>
-            <p>${verdictDesc}</p>
-        </div>
+// ===== File Handling =====
+async function handleFile(file) {
+    selectedFile = file;
+    dropZone.innerHTML = `
+        <div class="upload-icon">📄</div>
+        <h3>${file.name}</h3>
+        <p>Size: ${(file.size / 1024).toFixed(1)} KB</p>
+        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Change File</button>
     `;
 
-    // Criteria cards
-    resultsCriteria.innerHTML = '';
-    CRITERIA.forEach((criterion, index) => {
-        const score = scores[criterion.key];
-        const reason = reasons[criterion.key];
-        const suggestion = suggestions[criterion.key];
-        
-        let scoreClass = 'score-low';
-        let barWidth = 0;
-        
-        if (criterion.max === 100) {
-            scoreClass = score >= 80 ? 'score-high' : score >= 60 ? 'score-mid' : 'score-low';
-            barWidth = score;
-        } else {
-            scoreClass = score >= 4 ? 'score-high' : score >= 3 ? 'score-mid' : 'score-low';
-            barWidth = (score / 5) * 100;
-        }
+    // Reset progress
+    progressContainer.style.display = 'block';
+    updateProgress(0, "Ready to process");
+}
 
-        const card = document.createElement('div');
-        card.className = 'criteria-card';
-        card.style.animationDelay = `${index * 100}ms`;
-        card.innerHTML = `
-            <div class="criteria-header">
-                <div class="criteria-name">
-                    <span class="criteria-emoji">${criterion.emoji}</span>
-                    ${criterion.name}
-                </div>
-                <span class="criteria-score-badge ${scoreClass}">${score}/${criterion.max}</span>
-            </div>
-            <div class="criteria-bar">
-                <div class="criteria-bar-fill" style="width: 0%;" data-width="${barWidth}"></div>
-            </div>
-            <div class="criteria-feedback">
-                <div class="feedback-section">
-                    <div class="feedback-label">Assessment</div>
-                    <p>${reason}</p>
-                </div>
-                <div class="feedback-section">
-                    <div class="feedback-label">Suggestion</div>
-                    <p>${suggestion}</p>
-                </div>
-            </div>
-        `;
-        resultsCriteria.appendChild(card);
-    });
+function updateProgress(percent, text) {
+    progressBar.style.width = `${percent}%`;
+    progressText.textContent = text;
+}
 
-    // Populate Related Papers
-    if (relatedPapersContainer && relatedPapersList) {
-        const mockPapers = [
-            { title: "Zero-shot Learning Interfaces for NLP Grading", authors: "Chen, X. & Wang, L.", year: 2025 },
-            { title: "Automated Academic Essay Scoring via Transformer Architectures", authors: "Smith, J. et al.", year: 2024 },
-            { title: "A Comprehensive Survey on LLMs in Peer Review", authors: "Kim, D. & Lee, S.", year: 2025 }
-        ];
-        
-        relatedPapersList.innerHTML = mockPapers.map(p => `
-            <div style="background: var(--bg-card); padding: 1rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); display:flex; justify-content: space-between; align-items:center;">
-                <div>
-                    <h4 style="font-size: 0.9rem; margin-bottom: 0.25rem; color:var(--text-primary); cursor: pointer; text-decoration: underline; text-decoration-color: transparent; transition: 0.2s;" onmouseover="this.style.textDecorationColor='var(--accent-purple)'" onmouseout="this.style.textDecorationColor='transparent'">${p.title}</h4>
-                    <p style="font-size: 0.75rem; color:var(--text-muted);">${p.authors} (${p.year})</p>
-                </div>
-                <button class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">View PDF</button>
-            </div>
-        `).join('');
-        relatedPapersContainer.style.display = 'block';
+async function startProcessing() {
+    if (!selectedFile) {
+        showToast("⚠️ Please upload a file first", true);
+        return;
+    }
+    if (!GEMINI_API_KEY) {
+        configOverlay.style.display = 'flex';
+        return;
     }
 
-    // Save data for report page
-    const reportData = {
-        scores, reasons, suggestions, overall, verdict, verdictDesc
-    };
-    localStorage.setItem('paperLensReport', JSON.stringify(reportData));
+    try {
+        processingOverlay.style.display = 'flex';
+        updateProgress(20, "Extracting text...");
 
-    // Show results
-    outputLoading.style.display = 'none';
-    outputResults.style.display = 'block';
-    copyResultBtn.style.display = 'flex';
+        // 1. Extract Text
+        extractedText = await extractTextFromFile(selectedFile);
+        updateProgress(40, "Preparing AI analysis...");
 
-    // Animate bars
-    requestAnimationFrame(() => {
-        document.querySelectorAll('.criteria-bar-fill').forEach(bar => {
-            bar.style.width = bar.dataset.width + '%';
+        // 2. Call AI
+        const scope = scopeInput.value.trim() || "General Data Analysis";
+        const analysisResults = await callGeminiAI(extractedText, scope);
+        updateProgress(80, "Visualizing insights...");
+
+        // 3. Render Dashboard
+        renderDashboard(analysisResults);
+        
+        updateProgress(100, "Analysis Complete");
+        setTimeout(() => {
+            processingOverlay.style.display = 'none';
+            dashboard.style.display = 'block';
+            dashboard.scrollIntoView({ behavior: 'smooth' });
+        }, 500);
+
+    } catch (error) {
+        console.error(error);
+        processingOverlay.style.display = 'none';
+        showToast("❌ Error: " + error.message, true);
+    }
+}
+
+async function extractTextFromFile(file) {
+    const extension = file.name.split('.').pop().toLowerCase();
+    
+    if (extension === 'pdf') {
+        const reader = new FileReader();
+        return new Promise((resolve, reject) => {
+            reader.onload = async (e) => {
+                try {
+                    const typedarray = new Uint8Array(e.target.result);
+                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    let fullText = "";
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        fullText += textContent.items.map(item => item.str).join(" ") + "\n";
+                    }
+                    resolve(fullText);
+                } catch (err) {
+                    reject(err);
+                }
+            };
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
         });
+    } else if (extension === 'xlsx' || extension === 'xls' || extension === 'csv') {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(firstSheet);
+                resolve(JSON.stringify(json, null, 2));
+            };
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+        });
+    }
+    throw new Error("Unsupported file format");
+}
+
+// ===== AI Integration =====
+async function callGeminiAI(text, scope) {
+    const prompt = `
+        Analyze the following data within the scope of "${scope}".
+        Provide a structured JSON response with the following fields:
+        {
+          "summary": "Short professional executive summary",
+          "extractConfidence": 0.95,
+          "costConfidence": 0.88,
+          "riskConfidence": 0.76,
+          "entities": [
+            {"entity": "Entity Name", "category": "Category", "value": "Value", "confidence": 0.9}
+          ],
+          "riskData": [10, 20, 30, 40] // array of values for Low, Medium, High, Critical
+        }
+        Data: ${text.substring(0, 10000)}
+    `;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+        })
+    });
+
+    if (!response.ok) throw new Error("AI API failure. Check your key.");
+    
+    const resData = await response.json();
+    const resultText = resData.candidates[0].content.parts[0].text;
+    
+    // Clean JSON from markdown if exists
+    const cleanJson = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanJson);
+}
+
+// ===== Dashboard Rendering =====
+function renderDashboard(data) {
+    // 1. Text Summary
+    document.getElementById('summaryText').innerHTML = `<p>${data.summary}</p>`;
+    document.getElementById('dashboardSubtitle').textContent = `Analysis conducted on ${new Date().toLocaleDateString()}`;
+
+    // 2. Confidence Scores
+    animateScore('extractConfidence', data.extractConfidence * 100);
+    animateScore('costConfidence', data.costConfidence * 100);
+    animateScore('riskConfidence', data.riskConfidence * 100);
+
+    // 3. Entities Table
+    const tbody = document.querySelector('#entitiesTable tbody');
+    tbody.innerHTML = data.entities.map(e => `
+        <tr>
+            <td><strong>${e.entity}</strong></td>
+            <td>${e.category}</td>
+            <td>${e.value}</td>
+            <td><span class="badge ${getConfidenceClass(e.confidence)}">${(e.confidence * 100).toFixed(0)}%</span></td>
+        </tr>
+    `).join('');
+
+    // 4. Charts
+    renderChart(data.riskData);
+}
+
+function renderChart(riskData) {
+    const ctx = document.getElementById('riskChart').getContext('2d');
+    if (chartInstance) chartInstance.destroy();
+
+    chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Low', 'Medium', 'High', 'Critical'],
+            datasets: [{
+                data: riskData,
+                backgroundColor: ['#10b981', '#f59e0b', '#f97316', '#ef4444'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
     });
 }
 
-// ===== Detailed Report Navigation =====
-if (viewReportBtn) {
-    viewReportBtn.addEventListener('click', () => {
-        window.location.href = 'report.html';
-    });
+function animateScore(id, target) {
+    const el = document.getElementById(id);
+    let current = 0;
+    const interval = setInterval(() => {
+        if (current >= target) {
+            el.textContent = `${target.toFixed(0)}%`;
+            clearInterval(interval);
+        } else {
+            current += 2;
+            el.textContent = `${current}%`;
+        }
+    }, 20);
 }
 
-// ===== Copy Results =====
-copyResultBtn.addEventListener('click', () => {
-    const text = outputResults.innerText;
-    navigator.clipboard.writeText(text).then(() => {
-        showToast('📋 Results copied to clipboard!');
-    }).catch(() => {
-        showToast('Failed to copy.', true);
-    });
-});
+function getConfidenceClass(conf) {
+    if (conf >= 0.9) return 'score-high';
+    if (conf >= 0.7) return 'score-mid';
+    return 'score-low';
+}
 
 // ===== Toast =====
 function showToast(message, isError = false) {
-    // Remove existing toasts
-    document.querySelectorAll('.toast').forEach(t => t.remove());
-
     const toast = document.createElement('div');
     toast.className = `toast ${isError ? 'error' : ''}`;
     toast.textContent = message;
     document.body.appendChild(toast);
-
     requestAnimationFrame(() => toast.classList.add('show'));
-
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 400);
     }, 3000);
 }
-
-// ===== Init =====
-document.addEventListener('DOMContentLoaded', () => {
-    animateCounters();
-    setupScrollAnimations();
-});
