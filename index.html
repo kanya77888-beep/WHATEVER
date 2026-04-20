@@ -193,6 +193,11 @@
                             <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">Click or drag and drop</p>
                             <button class="btn btn-secondary" id="triggerUploadBtn">Choose File</button>
                         </div>
+                        <div style="margin: 1.5rem 1rem 1rem; border-top: 1px solid var(--border-subtle); padding-top: 1.5rem;">
+                            <label for="scopeInput" style="display:block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem;">🎯 Target Scope/Keywords (Optional)</label>
+                            <input type="text" id="scopeInput" placeholder="e.g., machine learning, NLP, computer vision" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); font-family: var(--font-sans); background: transparent; color: var(--text-primary); outline: none;">
+                            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">The AI will calculate a confidence score (1-100) based on how well your paper aligns with this scope.</p>
+                        </div>
                         <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; font-weight: 600;">OR PASTE TEXT</div>
                         <textarea 
                             id="paperInput" 
