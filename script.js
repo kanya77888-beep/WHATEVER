@@ -191,12 +191,13 @@ async function callGeminiAI(text, scope) {
           "entities": [
             {"entity": "Entity Name", "category": "Category", "value": "Value", "confidence": 0.9}
           ],
-          "riskData": [10, 20, 30, 40] // array of values for Low, Medium, High, Critical
+          "riskData": [10, 20, 30, 40] 
         }
+        IMPORTANT: Return ONLY the JSON object. No preamble, no postamble, no markdown markers.
         Data: ${text.substring(0, 10000)}
     `;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -204,14 +205,24 @@ async function callGeminiAI(text, scope) {
         })
     });
 
-    if (!response.ok) throw new Error("AI API failure. Check your key.");
+    if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody?.error?.message || `API Error: ${response.status} ${response.statusText}`);
+    }
     
     const resData = await response.json();
+    if (!resData.candidates || !resData.candidates[0]) throw new Error("AI returned an empty response.");
+    
     const resultText = resData.candidates[0].content.parts[0].text;
     
     // Clean JSON from markdown if exists
-    const cleanJson = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanJson);
+    const cleanJson = resultText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    try {
+        return JSON.parse(cleanJson);
+    } catch (e) {
+        console.log("Raw AI Response:", resultText);
+        throw new Error("Failed to parse AI response. The data may be too complex or the AI reached a safety limit.");
+    }
 }
 
 // ===== Dashboard Rendering =====
