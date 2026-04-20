@@ -14,9 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
         { name: 'Novelty / Originality', emoji: '💡', key: 'novelty' },
         { name: 'Technical Soundness', emoji: '⚙️', key: 'technical' },
         { name: 'Methodology & Rigor', emoji: '🔬', key: 'methodology' },
-        { name: 'Significance / Impact', emoji: '⚡', key: 'significance' },
-        { name: 'Structure & Organization', emoji: '📋', key: 'structure' },
-        { name: 'Literature & References', emoji: '📚', key: 'literature' },
+        { name: 'Significance / Impact', emoji: '⚡', key: 'significance', max: 5 },
+        { name: 'Structure & Organization', emoji: '📋', key: 'structure', max: 5 },
+        { name: 'Literature & References', emoji: '📚', key: 'literature', max: 5 },
+        { name: 'Scope Fit (Confidence)', emoji: '🎯', key: 'scope', max: 100 },
     ];
 
     const contentDiv = document.getElementById('reportContent');
@@ -53,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h2 style="display:flex; align-items:center; gap: 0.5rem;">
                         <span>${criterion.emoji}</span> ${criterion.name}
                     </h2>
-                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent-indigo);">${score}/5.0</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent-indigo);">${score}/${criterion.max === 100 ? '100' : '5.0'}</div>
                 </div>
                 
                 <h4 style="margin-top: 1rem; font-size: 0.9rem;">Assessment:</h4>
@@ -64,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h4 style="margin-top: 1.5rem; font-size: 0.9rem;">Actionable Improvements:</h4>
                 <ul style="margin-top: 0.5rem; padding-left: 1.5rem; color: var(--text-secondary);">
                     <li>${suggestion}</li>
-                    ${score < 3 ? '<li>Re-evaluate this section entirely against standard formatting guidelines.</li>' : ''}
+                    ${score < (criterion.max === 100 ? 50 : 3) ? '<li>Re-evaluate this section entirely against standard formatting guidelines.</li>' : ''}
                 </ul>
             </div>
         `;

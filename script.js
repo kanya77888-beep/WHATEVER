@@ -7,13 +7,14 @@ const SAMPLE_PAPER = `This paper introduces a novel method for AI paper evaluati
 
 // --- Review criteria config ---
 const CRITERIA = [
-    { name: 'Clarity & Writing Quality', emoji: '📝', key: 'clarity' },
-    { name: 'Novelty / Originality', emoji: '💡', key: 'novelty' },
-    { name: 'Technical Soundness', emoji: '⚙️', key: 'technical' },
-    { name: 'Methodology & Rigor', emoji: '🔬', key: 'methodology' },
-    { name: 'Significance / Impact', emoji: '⚡', key: 'significance' },
-    { name: 'Structure & Organization', emoji: '📋', key: 'structure' },
-    { name: 'Literature & References', emoji: '📚', key: 'literature' },
+    { name: 'Clarity & Writing Quality', emoji: '📝', key: 'clarity', max: 5 },
+    { name: 'Novelty / Originality', emoji: '💡', key: 'novelty', max: 5 },
+    { name: 'Technical Soundness', emoji: '⚙️', key: 'technical', max: 5 },
+    { name: 'Methodology & Rigor', emoji: '🔬', key: 'methodology', max: 5 },
+    { name: 'Significance / Impact', emoji: '⚡', key: 'significance', max: 5 },
+    { name: 'Structure & Organization', emoji: '📋', key: 'structure', max: 5 },
+    { name: 'Literature & References', emoji: '📚', key: 'literature', max: 5 },
+    { name: 'Scope Fit (Confidence)', emoji: '🎯', key: 'scope', max: 100 },
 ];
 
 // ===== DOM Elements =====
@@ -37,6 +38,7 @@ const triggerUploadBtn = document.getElementById('triggerUploadBtn');
 const relatedPapersContainer = document.getElementById('relatedPapersContainer');
 const relatedPapersList = document.getElementById('relatedPapersList');
 const viewReportBtn = document.getElementById('viewReportBtn');
+const scopeInput = document.getElementById('scopeInput');
 
 // ===== Background Particles =====
 function createParticles() {
@@ -305,6 +307,35 @@ function generateReview(text) {
         : 'No formal references or citations are present. The work lacks grounding in existing literature.';
     suggestions.literature = 'Add a thorough literature review section citing at least 15-20 relevant, recent papers in the field.';
 
+    // Scope
+    let scopeScore = 85; 
+    let scopeReason = "Paper naturally fits typical academic formatting and tone.";
+    let scopeSugg = "No specific scope was provided, so evaluating on general academic merit.";
+    
+    if (scopeInput && scopeInput.value.trim().length > 0) {
+        const keywords = scopeInput.value.toLowerCase().split(',').map(s => s.trim()).filter(s => s);
+        let matches = 0;
+        keywords.forEach(kw => {
+            if (text.toLowerCase().includes(kw)) matches++;
+        });
+        
+        if (matches === 0) scopeScore = 30;
+        else if (matches === keywords.length) scopeScore = 95;
+        else scopeScore = 60 + Math.floor((matches / keywords.length) * 35);
+        
+        scopeReason = matches > 0 
+            ? \`Found \${matches} out of \${keywords.length} target keywords. The paper aligns well with the provided scope.\`
+            : "The paper lacks the specific keywords defined in the target scope. Alignment is questionable.";
+            
+        scopeSugg = matches < keywords.length
+            ? "Consider explicitly incorporating the missing keywords into the abstract and introduction to strengthen scope alignment."
+            : "Strong alignment! Ensure the core thesis deeply explores these matched keywords.";
+    }
+    
+    scores.scope = scopeScore;
+    reasons.scope = scopeReason;
+    suggestions.scope = scopeSugg;
+
     return { scores, reasons, suggestions };
 }
 
@@ -343,8 +374,17 @@ function displayResults(results) {
         const score = scores[criterion.key];
         const reason = reasons[criterion.key];
         const suggestion = suggestions[criterion.key];
-        const scoreClass = score >= 4 ? 'score-high' : score >= 3 ? 'score-mid' : 'score-low';
-        const barWidth = (score / 5) * 100;
+        
+        let scoreClass = 'score-low';
+        let barWidth = 0;
+        
+        if (criterion.max === 100) {
+            scoreClass = score >= 80 ? 'score-high' : score >= 60 ? 'score-mid' : 'score-low';
+            barWidth = score;
+        } else {
+            scoreClass = score >= 4 ? 'score-high' : score >= 3 ? 'score-mid' : 'score-low';
+            barWidth = (score / 5) * 100;
+        }
 
         const card = document.createElement('div');
         card.className = 'criteria-card';
@@ -355,7 +395,7 @@ function displayResults(results) {
                     <span class="criteria-emoji">${criterion.emoji}</span>
                     ${criterion.name}
                 </div>
-                <span class="criteria-score-badge ${scoreClass}">${score}/5</span>
+                <span class="criteria-score-badge ${scoreClass}">${score}/${criterion.max}</span>
             </div>
             <div class="criteria-bar">
                 <div class="criteria-bar-fill" style="width: 0%;" data-width="${barWidth}"></div>
