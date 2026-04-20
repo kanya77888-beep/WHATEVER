@@ -5,36 +5,36 @@
 
 /* --- CSS Variables / Tokens --- */
 :root {
-    --bg-primary: #0a0a1a;
-    --bg-secondary: #111128;
-    --bg-card: #16163a;
-    --bg-card-hover: #1e1e4a;
-    --bg-input: #0d0d24;
-    --bg-panel: #12122e;
+    --bg-primary: #f8fafc;
+    --bg-secondary: #f1f5f9;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f1f5f9;
+    --bg-input: #ffffff;
+    --bg-panel: #ffffff;
 
-    --text-primary: #f0f0ff;
-    --text-secondary: #a0a0c0;
-    --text-muted: #6b6b8d;
+    --text-primary: #1e293b;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
 
-    --accent-indigo: #818cf8;
-    --accent-purple: #c084fc;
-    --accent-pink: #f472b6;
-    --accent-green: #34d399;
-    --accent-yellow: #fbbf24;
-    --accent-orange: #fb923c;
-    --accent-blue: #38bdf8;
+    --accent-indigo: #0f4c81;
+    --accent-purple: #3b82f6;
+    --accent-pink: #ec4899;
+    --accent-green: #10b981;
+    --accent-yellow: #f59e0b;
+    --accent-orange: #f97316;
+    --accent-blue: #0284c7;
 
-    --gradient-primary: linear-gradient(135deg, #818cf8, #c084fc);
-    --gradient-hero: linear-gradient(135deg, #818cf8 0%, #c084fc 50%, #f472b6 100%);
-    --gradient-glow: radial-gradient(ellipse at center, rgba(129, 140, 248, 0.15), transparent 70%);
+    --gradient-primary: linear-gradient(135deg, #0f4c81, #1e3a8a);
+    --gradient-hero: linear-gradient(135deg, #0f4c81 0%, #1e3a8a 50%, #3b82f6 100%);
+    --gradient-glow: radial-gradient(ellipse at center, rgba(15, 76, 129, 0.08), transparent 70%);
 
-    --border-subtle: rgba(255, 255, 255, 0.06);
-    --border-active: rgba(129, 140, 248, 0.3);
+    --border-subtle: rgba(15, 23, 42, 0.1);
+    --border-active: rgba(15, 76, 129, 0.4);
 
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 16px 64px rgba(0, 0, 0, 0.5);
-    --shadow-glow: 0 0 40px rgba(129, 140, 248, 0.15);
+    --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.04);
+    --shadow-md: 0 8px 32px rgba(15, 23, 42, 0.06);
+    --shadow-lg: 0 16px 64px rgba(15, 23, 42, 0.08);
+    --shadow-glow: 0 0 40px rgba(15, 76, 129, 0.1);
 
     --radius-sm: 8px;
     --radius-md: 12px;
@@ -108,13 +108,13 @@ body {
     transition: var(--transition-base);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    background: rgba(10, 10, 26, 0.7);
+    background: rgba(255, 255, 255, 0.8);
     border-bottom: 1px solid transparent;
 }
 
 .navbar.scrolled {
     border-bottom: 1px solid var(--border-subtle);
-    background: rgba(10, 10, 26, 0.9);
+    background: rgba(255, 255, 255, 0.95);
 }
 
 .nav-container {

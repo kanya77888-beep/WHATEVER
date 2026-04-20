@@ -11,8 +11,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Animated Background Particles -->
-    <div class="bg-particles" id="bgParticles"></div>
+    <!-- Removed Background Particles for cleaner theme -->
 
     <!-- Navigation -->
     <nav class="navbar" id="navbar">
@@ -187,12 +186,19 @@
                         <div class="char-count" id="charCount">0 characters</div>
                     </div>
                     <div class="input-area">
+                        <div class="file-upload-zone" id="fileUploadZone" style="border: 2px dashed var(--border-subtle); padding: 1.5rem; text-align: center; border-radius: var(--radius-md); margin: 1rem; cursor: pointer; transition: 0.2s; background: rgba(0,0,0,0.01);">
+                            <input type="file" id="pdfFileInput" accept=".pdf" style="display:none;">
+                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📄</div>
+                            <h4 style="color: var(--text-primary); margin-bottom: 0.25rem;">Upload Research Paper (PDF)</h4>
+                            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">Click or drag and drop</p>
+                            <button class="btn btn-secondary" id="triggerUploadBtn">Choose File</button>
+                        </div>
+                        <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; font-weight: 600;">OR PASTE TEXT</div>
                         <textarea 
                             id="paperInput" 
-                            placeholder="Paste your research paper or abstract here...
-
-Example: 'This paper introduces a novel method for AI paper evaluation using large language models. The structure of our framework leverages a zero-shot learning approach...'"
+                            placeholder="Paste your research paper or abstract here..."
                             spellcheck="false"
+                            style="min-height: 200px;"
                         ></textarea>
                     </div>
                     <div class="input-actions">
@@ -262,6 +268,20 @@ Example: 'This paper introduces a novel method for AI paper evaluation using lar
                     <div class="output-results" id="outputResults" style="display:none;">
                         <div class="results-summary" id="resultsSummary"></div>
                         <div class="results-criteria" id="resultsCriteria"></div>
+                        
+                        <!-- Related Papers Section -->
+                        <div class="related-papers" id="relatedPapersContainer" style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-subtle); display: none;">
+                            <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color: var(--text-primary);">📚 Related Available Papers</h3>
+                            <div id="relatedPapersList" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 2rem; text-align: center;">
+                            <button class="btn btn-primary" id="viewReportBtn" style="width: 100%; justify-content: center; padding: 1rem;">
+                                View Detailed Analysis & Download Report
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detailed Analysis Report — PaperLens</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .report-header {
+            padding: 8rem 2rem 4rem;
+            text-align: center;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .report-content {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+        .report-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-sm);
+        }
+        .quote-box {
+            border-left: 4px solid var(--accent-orange);
+            background: rgba(249, 115, 22, 0.05);
+            padding: 1rem 1.5rem;
+            margin: 1rem 0;
+            font-style: italic;
+            color: var(--text-secondary);
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        }
+        .score-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 1rem;
+        }
+        @media print {
+            .navbar, .btn, .footer { display: none; }
+            .report-header { padding: 2rem; }
+            body { background: white; }
+            .report-card { box-shadow: none; break-inside: avoid; border: 1px solid #ccc; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">
+                <span style="font-size: 1.5rem;">←</span>
+                <span>Back to Editor</span>
+            </a>
+            <button class="btn btn-primary" onclick="window.print()">Download PDF Report</button>
+        </div>
+    </nav>
+
+    <header class="report-header">
+        <div class="section-tag" style="margin-bottom: 1rem;">Analysis Report</div>
+        <h1 class="section-title">Detailed Feedback & Improvements</h1>
+        <p class="section-subtitle" id="reportSubtitle">Loading your analysis data...</p>
+    </header>
+
+    <main class="report-content" id="reportContent">
+        <!-- JS injects content here -->
+    </main>
+
+    <script src="report.js"></script>
+</body>
+</html>

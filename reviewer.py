@@ -1,14 +1,18 @@
 import os
 import sys
 from google import genai
+import pypdf
 
-# This is the exact prompt you provided!
-REVIEW_PROMPT = """Evaluate the following research paper section using the criteria below.
+# This is the template for the prompt!
+REVIEW_PROMPT_TEMPLATE = """Evaluate the following research paper section using the criteria below.
+
+Target Scope/Keywords: {scope_text}
 
 For EACH criterion:
-- Give a score from 1 to 5
-- Provide a clear reason
-- Provide actionable suggestions
+- Give a score from 1 to 5 (except for Scope Fit and AI Authorship, provide a score from 1 to 100).
+- Explain EXACTLY why marks were deducted (if applicable).
+- Quote specific sentences or passages from the paper where the problem occurs.
+- Provide clear, actionable improvement points.
 
 Criteria:
 1. Clarity & Writing Quality
@@ -18,6 +22,8 @@ Criteria:
 5. Significance / Impact
 6. Structure & Organization
 7. Literature & References
+8. Scope Fit (Evaluate alignment with the Target Scope/Keywords)
+9. AI Authorship Score (Estimate the likelihood the text was AI-generated from 1 to 100, where 100 means definitely AI)
 
 IMPORTANT:
 - Avoid generic statements
@@ -57,10 +63,28 @@ def main():
         sys.exit(1)
 
     # Read the paper content
-    with open(paper_file, "r", encoding="utf-8") as f:
-        paper_content = f.read()
+    if paper_file.lower().endswith('.pdf'):
+        try:
+            reader = pypdf.PdfReader(paper_file)
+            paper_content = ""
+            for page in reader.pages:
+                paper_content += page.extract_text() + "\n"
+        except Exception as e:
+            print(f"Failed to read PDF file: {e}")
+            sys.exit(1)
+    else:
+        with open(paper_file, "r", encoding="utf-8") as f:
+            paper_content = f.read()
 
-    print(f"Reading '{paper_file}' and sending to Gemini for review...")
+    # 3.5 Ask for scope/keywords
+    print("\n--- Scope Alignment ---")
+    scope = input("Enter target keywords or target journal scope to check alignment (or press Enter to skip): ").strip()
+    if not scope:
+        scope = "Not specified. Evaluate independently."
+        
+    final_prompt = REVIEW_PROMPT_TEMPLATE.format(scope_text=scope)
+
+    print(f"\nReading '{paper_file}' and sending to Gemini for review...")
     print("-" * 50)
     
     # 4. Generate the response by combining your prompt + the paper
@@ -68,7 +92,7 @@ def main():
         # We are using gemini-2.5-flash as it is fast and excellent at these tasks
         response = client.models.generate_content(
             model="gemini-2.5-flash",
-            contents=REVIEW_PROMPT + "\n" + paper_content
+            contents=final_prompt + "\n" + paper_content
         )
         print("--- REVIEW RESULTS ---\n")
         print(response.text)

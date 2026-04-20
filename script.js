@@ -30,6 +30,14 @@ const resultsCriteria = document.getElementById('resultsCriteria');
 const copyResultBtn = document.getElementById('copyResultBtn');
 const navbar = document.getElementById('navbar');
 
+// New App UI elements
+const fileUploadZone = document.getElementById('fileUploadZone');
+const pdfFileInput = document.getElementById('pdfFileInput');
+const triggerUploadBtn = document.getElementById('triggerUploadBtn');
+const relatedPapersContainer = document.getElementById('relatedPapersContainer');
+const relatedPapersList = document.getElementById('relatedPapersList');
+const viewReportBtn = document.getElementById('viewReportBtn');
+
 // ===== Background Particles =====
 function createParticles() {
     const container = document.getElementById('bgParticles');
@@ -102,6 +110,43 @@ paperInput.addEventListener('input', () => {
     charCount.textContent = `${len.toLocaleString()} character${len !== 1 ? 's' : ''}`;
 });
 
+// ===== PDF Upload Logic =====
+if (triggerUploadBtn) {
+    triggerUploadBtn.addEventListener('click', (e) => { e.stopPropagation(); pdfFileInput.click(); });
+    fileUploadZone.addEventListener('click', () => pdfFileInput.click());
+    pdfFileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            const file = e.target.files[0];
+            // Mock PDF extraction by inserting sample text
+            paperInput.value = `[Extracted from PDF: ${file.name}]\n\n${SAMPLE_PAPER}\n\n(Review simulation text automatically inserted for preview.)`;
+            paperInput.dispatchEvent(new Event('input'));
+            showToast('📄 PDF processed successfully!');
+        }
+    });
+
+    fileUploadZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        fileUploadZone.style.background = 'rgba(15, 76, 129, 0.05)';
+        fileUploadZone.style.borderColor = 'var(--accent-indigo)';
+    });
+
+    fileUploadZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        fileUploadZone.style.background = 'rgba(0,0,0,0.01)';
+        fileUploadZone.style.borderColor = 'var(--border-subtle)';
+    });
+
+    fileUploadZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        fileUploadZone.style.background = 'rgba(0,0,0,0.01)';
+        fileUploadZone.style.borderColor = 'var(--border-subtle)';
+        if (e.dataTransfer.files.length > 0) {
+            pdfFileInput.files = e.dataTransfer.files;
+            pdfFileInput.dispatchEvent(new Event('change'));
+        }
+    });
+}
+
 // ===== Load Sample =====
 loadSampleBtn.addEventListener('click', () => {
     paperInput.value = SAMPLE_PAPER;
@@ -117,6 +162,8 @@ clearBtn.addEventListener('click', () => {
     outputLoading.style.display = 'none';
     outputResults.style.display = 'none';
     copyResultBtn.style.display = 'none';
+    if(relatedPapersContainer) relatedPapersContainer.style.display = 'none';
+    if(pdfFileInput) pdfFileInput.value = ''; // clear file
 });
 
 // ===== Review Button =====
@@ -327,6 +374,32 @@ function displayResults(results) {
         resultsCriteria.appendChild(card);
     });
 
+    // Populate Related Papers
+    if (relatedPapersContainer && relatedPapersList) {
+        const mockPapers = [
+            { title: "Zero-shot Learning Interfaces for NLP Grading", authors: "Chen, X. & Wang, L.", year: 2025 },
+            { title: "Automated Academic Essay Scoring via Transformer Architectures", authors: "Smith, J. et al.", year: 2024 },
+            { title: "A Comprehensive Survey on LLMs in Peer Review", authors: "Kim, D. & Lee, S.", year: 2025 }
+        ];
+        
+        relatedPapersList.innerHTML = mockPapers.map(p => `
+            <div style="background: var(--bg-card); padding: 1rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); display:flex; justify-content: space-between; align-items:center;">
+                <div>
+                    <h4 style="font-size: 0.9rem; margin-bottom: 0.25rem; color:var(--text-primary); cursor: pointer; text-decoration: underline; text-decoration-color: transparent; transition: 0.2s;" onmouseover="this.style.textDecorationColor='var(--accent-purple)'" onmouseout="this.style.textDecorationColor='transparent'">${p.title}</h4>
+                    <p style="font-size: 0.75rem; color:var(--text-muted);">${p.authors} (${p.year})</p>
+                </div>
+                <button class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">View PDF</button>
+            </div>
+        `).join('');
+        relatedPapersContainer.style.display = 'block';
+    }
+
+    // Save data for report page
+    const reportData = {
+        scores, reasons, suggestions, overall, verdict, verdictDesc
+    };
+    localStorage.setItem('paperLensReport', JSON.stringify(reportData));
+
     // Show results
     outputLoading.style.display = 'none';
     outputResults.style.display = 'block';
@@ -337,6 +410,13 @@ function displayResults(results) {
         document.querySelectorAll('.criteria-bar-fill').forEach(bar => {
             bar.style.width = bar.dataset.width + '%';
         });
+    });
+}
+
+// ===== Detailed Report Navigation =====
+if (viewReportBtn) {
+    viewReportBtn.addEventListener('click', () => {
+        window.location.href = 'report.html';
     });
 }
 
@@ -370,7 +450,6 @@ function showToast(message, isError = false) {
 
 // ===== Init =====
 document.addEventListener('DOMContentLoaded', () => {
-    createParticles();
     animateCounters();
     setupScrollAnimations();
 });
